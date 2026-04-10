@@ -1,6 +1,6 @@
 """微博搜索模块 - 搜索微博热门内容。
 
-Author: Jesse (https://github.com/ChiTing111)
+Author: Jesse (https://github.com/Jesseovo)
 
 支持两种模式：
 1. 微博开放平台 API（需要 WEIBO_ACCESS_TOKEN）

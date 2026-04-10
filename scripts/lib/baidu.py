@@ -1,6 +1,6 @@
 """百度搜索模块 - 替代 Exa/Brave 等 Web 搜索后端。
 
-Author: Jesse (https://github.com/ChiTing111)
+Author: Jesse (https://github.com/Jesseovo)
 
 使用百度搜索 API 或公开搜索进行网页搜索。
 """

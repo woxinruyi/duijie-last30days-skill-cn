@@ -1,6 +1,6 @@
 """Environment and API key management for last30days-cn (Chinese platforms).
 
-Author: Jesse (https://github.com/ChiTing111)
+Author: Jesse (https://github.com/Jesseovo)
 """
 
 import logging

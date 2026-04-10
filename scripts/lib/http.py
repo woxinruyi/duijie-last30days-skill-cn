@@ -1,6 +1,6 @@
 """HTTP utilities for last30days skill (stdlib only).
 
-Author: Jesse (https://github.com/ChiTing111)
+Author: Jesse (https://github.com/Jesseovo)
 """
 
 import json

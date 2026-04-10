@@ -1,6 +1,6 @@
 """知乎搜索模块 - 搜索知乎问答和文章。
 
-Author: Jesse (https://github.com/ChiTing111)
+Author: Jesse (https://github.com/Jesseovo)
 
 使用知乎公开搜索接口和热榜 API。
 """

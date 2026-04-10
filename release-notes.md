@@ -1,6 +1,6 @@
 # 发行说明
 
-> Author: Jesse (https://github.com/ChiTing111)
+> Author: Jesse (https://github.com/Jesseovo)
 
 ## v1.0.0
 

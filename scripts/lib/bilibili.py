@@ -1,6 +1,6 @@
 """B站搜索模块 - 搜索哔哩哔哩视频内容。
 
-Author: Jesse (https://github.com/ChiTing111)
+Author: Jesse (https://github.com/Jesseovo)
 
 使用 B站公开搜索 API（无需 API Key）。
 """

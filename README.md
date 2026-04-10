@@ -6,7 +6,7 @@
 
 🔗 本项目基于 [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill) 进行深度本土化改造，完全面向中国用户和中文互联网平台。
 
-👤 **作者 / Author:** Jesse ([@ChiTing111](https://github.com/ChiTing111))
+👤 **作者 / Author:** Jesse ([@Jesseovo](https://github.com/Jesseovo))
 
 ---
 
@@ -43,7 +43,7 @@
 将项目克隆到 Cursor 技能目录：
 
 ```bash
-git clone https://github.com/ChiTing111/last30days-skill-cn.git
+git clone https://github.com/Jesseovo/last30days-skill-cn.git
 ```
 
 然后在 Cursor 中将 `SKILL.md` 添加为项目技能。
@@ -51,19 +51,19 @@ git clone https://github.com/ChiTing111/last30days-skill-cn.git
 ### Claude Code
 
 ```bash
-git clone https://github.com/ChiTing111/last30days-skill-cn.git ~/.claude/skills/last30days-cn
+git clone https://github.com/Jesseovo/last30days-skill-cn.git ~/.claude/skills/last30days-cn
 ```
 
 ### OpenClaw / ClawHub
 
 ```bash
-git clone https://github.com/ChiTing111/last30days-skill-cn.git ~/.agents/skills/last30days-cn
+git clone https://github.com/Jesseovo/last30days-skill-cn.git ~/.agents/skills/last30days-cn
 ```
 
 ### Gemini CLI
 
 ```bash
-git clone https://github.com/ChiTing111/last30days-skill-cn.git
+git clone https://github.com/Jesseovo/last30days-skill-cn.git
 # 在 Gemini CLI 中作为扩展加载
 ```
 
@@ -97,7 +97,7 @@ chmod 600 ~/.config/last30days-cn/.env
 # ============================================
 # last30days-cn 配置文件
 # ============================================
-# 作者: Jesse (https://github.com/ChiTing111)
+# 作者: Jesse (https://github.com/Jesseovo)
 #
 # 📌 说明：所有配置均为可选
 # B站、知乎、百度（基础）、今日头条无需 API Key 即可使用
@@ -271,7 +271,7 @@ last30days-skill-cn/
 本项目基于 [MIT License](LICENSE) 发布。
 
 - 🔗 原始项目: [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill) by Matt Van Horn
-- 🇨🇳 中文本土化: Jesse ([@ChiTing111](https://github.com/ChiTing111))
+- 🇨🇳 中文本土化: Jesse ([@Jesseovo](https://github.com/Jesseovo))
 
 ---
 
@@ -285,7 +285,7 @@ last30days-skill-cn/
 
 🔗 This project is a Chinese-localized fork of [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill), fully adapted for Chinese users and platforms.
 
-👤 **Author:** Jesse ([@ChiTing111](https://github.com/ChiTing111))
+👤 **Author:** Jesse ([@Jesseovo](https://github.com/Jesseovo))
 
 ---
 
@@ -320,7 +320,7 @@ last30days-skill-cn/
 ### Installation
 
 ```bash
-git clone https://github.com/ChiTing111/last30days-skill-cn.git
+git clone https://github.com/Jesseovo/last30days-skill-cn.git
 cd last30days-skill-cn
 pip install jieba
 ```
@@ -356,4 +356,4 @@ python scripts/last30days.py --diagnose   # Check platform availability
 This project is licensed under the [MIT License](LICENSE).
 
 - 🔗 Original: [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill) by Matt Van Horn
-- 🇨🇳 Chinese Fork: Jesse ([@ChiTing111](https://github.com/ChiTing111))
+- 🇨🇳 Chinese Fork: Jesse ([@Jesseovo](https://github.com/Jesseovo))

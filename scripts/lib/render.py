@@ -1,6 +1,6 @@
 """Output rendering for Chinese-platform research (last30days CN skill).
 
-Author: Jesse (https://github.com/ChiTing111)
+Author: Jesse (https://github.com/Jesseovo)
 """
 
 import json

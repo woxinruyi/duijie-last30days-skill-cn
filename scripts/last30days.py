@@ -2,7 +2,7 @@
 """
 last30days-cn - 研究过去30天内中国平台上的热门话题。
 
-Author: Jesse (https://github.com/ChiTing111)
+Author: Jesse (https://github.com/Jesseovo)
 
 Usage:
     python3 last30days.py <topic> [options]

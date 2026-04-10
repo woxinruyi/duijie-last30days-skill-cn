@@ -1,6 +1,6 @@
 """抖音搜索模块 - 搜索抖音短视频内容。
 
-Author: Jesse (https://github.com/ChiTing111)
+Author: Jesse (https://github.com/Jesseovo)
 
 支持 TikHub API 或抖音公开搜索接口。
 """

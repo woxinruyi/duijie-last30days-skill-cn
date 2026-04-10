@@ -1,6 +1,6 @@
 """小红书搜索模块 - 搜索小红书笔记。
 
-Author: Jesse (https://github.com/ChiTing111)
+Author: Jesse (https://github.com/Jesseovo)
 
 支持多种数据获取方式：
 1. ScrapeCreators API（推荐，同一个 key 也支持抖音）

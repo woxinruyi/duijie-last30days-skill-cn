@@ -1,6 +1,6 @@
 """last30days-cn 终端界面工具。
 
-Author: Jesse (https://github.com/ChiTing111)
+Author: Jesse (https://github.com/Jesseovo)
 """
 
 import sys
