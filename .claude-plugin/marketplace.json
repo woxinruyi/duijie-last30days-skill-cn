@@ -1,16 +1,17 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "last30days-cn",
+  "owner": "Jesseovo",
   "author": {
     "name": "Jesse",
     "url": "https://github.com/Jesseovo"
   },
-  "description": "中国平台深度研究引擎 - 搜索微博、小红书、B站、知乎等8大平台最近30天的热门内容。",
+  "description": "中国平台深度研究引擎 - 搜索微博、小红书、B站、知乎等8大平台最近30天的热门内容。集成 MediaCrawler 爬虫引擎，大幅减少 API Key 依赖。",
   "plugins": [
     {
       "name": "last30days-cn",
-      "description": "中国互联网平台深度研究技能，生成有据可查的研究报告。",
-      "version": "1.0.0",
+      "description": "中国互联网平台深度研究技能，集成 MediaCrawler 爬虫引擎，生成有据可查的研究报告。",
+      "version": "2.0.0",
       "source": "./",
       "category": "productivity"
     }

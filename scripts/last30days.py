@@ -123,6 +123,7 @@ from lib import (
     score,
     setup_wizard,
     query_type as qt,
+    crawler_bridge,
 )
 
 
@@ -303,6 +304,7 @@ def main():
     config = env.get_config()
 
     if args.diagnose:
+        crawler_status = crawler_bridge.get_crawler_status()
         diag = {
             "weibo": env.is_weibo_available(config),
             "xiaohongshu": env.is_xiaohongshu_available(config),
@@ -313,6 +315,11 @@ def main():
             "baidu_api": env.is_baidu_api_available(config),
             "toutiao": True,
             "xiaohongshu_api_base": env.get_xiaohongshu_api_base(config),
+            "crawler_engine": {
+                "playwright_available": crawler_status["playwright_available"],
+                "cached_logins": crawler_status["cached_logins"],
+                "note": "安装 Playwright 后，微博/小红书/抖音/B站/知乎可无需 API Key 使用爬虫模式",
+            },
         }
         print(json.dumps(diag, indent=2, ensure_ascii=False))
         sys.exit(0)

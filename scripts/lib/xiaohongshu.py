@@ -2,9 +2,10 @@
 
 Author: Jesse (https://github.com/Jesseovo)
 
-支持多种数据获取方式：
-1. ScrapeCreators API（推荐，同一个 key 也支持抖音）
-2. 公开搜索接口
+支持多种数据获取方式（按优先级自动切换）：
+1. ScrapeCreators API（同一个 key 也支持抖音）
+2. MediaCrawler 浏览器爬虫（需要 Playwright，无需 API Key）
+3. 公开搜索接口
 """
 
 import json
@@ -50,6 +51,17 @@ def search_xiaohongshu(
 
     if not items and token:
         items = _search_via_scrapecreators(topic, from_date, to_date, limit, token)
+
+    if not items:
+        try:
+            from . import crawler_bridge
+            if crawler_bridge.is_playwright_available():
+                sys.stderr.write("[小红书] 尝试 MediaCrawler 爬虫模式...\n")
+                items = crawler_bridge.crawl_xiaohongshu(topic, limit)
+                if items:
+                    sys.stderr.write(f"[小红书] 爬虫模式获取 {len(items)} 条结果\n")
+        except Exception as e:
+            sys.stderr.write(f"[小红书] 爬虫模式失败: {e}\n")
 
     if not items:
         items = _search_via_public(topic, limit)
