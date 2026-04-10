@@ -24,7 +24,7 @@ import os
 import signal
 import sys
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -63,14 +63,6 @@ def parse_search_flag(search_str: str) -> set:
         sys.exit(1)
     return sources
 
-
-def register_child_pid(pid: int):
-    with _child_pids_lock:
-        _child_pids.add(pid)
-
-def unregister_child_pid(pid: int):
-    with _child_pids_lock:
-        _child_pids.discard(pid)
 
 def _cleanup_children():
     with _child_pids_lock:

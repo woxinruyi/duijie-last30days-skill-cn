@@ -233,7 +233,6 @@ def get_missing_keys(config: Dict[str, Any]) -> str:
         or is_baidu_api_available(config)
         or bool(config.get("SCRAPECREATORS_API_KEY"))
         or bool(config.get("ZHIHU_COOKIE"))
-        or bool(config.get("TOUTIAO_API_KEY"))
     ):
         return "none"
     lines: List[str] = []
@@ -249,8 +248,6 @@ def get_missing_keys(config: Dict[str, Any]) -> str:
         lines.append("WECHAT_API_KEY")
     if not (config.get("BAIDU_API_KEY") and config.get("BAIDU_SECRET_KEY")):
         lines.append("BAIDU_API_KEY + BAIDU_SECRET_KEY")
-    if not config.get("TOUTIAO_API_KEY"):
-        lines.append("TOUTIAO_API_KEY")
     return "未配置：" + "；".join(lines)
 
 

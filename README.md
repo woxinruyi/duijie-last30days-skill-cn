@@ -152,6 +152,8 @@ touch ~/.config/last30days-cn/.env
 chmod 600 ~/.config/last30days-cn/.env
 ```
 
+**Windows（PowerShell）等价：** 创建目录与空配置文件可用 `New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.config\last30days-cn"` 与 `New-Item -ItemType File -Path "$env:USERPROFILE\.config\last30days-cn\.env" -Force`。限制 `.env` 仅当前用户可读写可近似使用 `icacls "$env:USERPROFILE\.config\last30days-cn\.env" /inheritance:r /grant:r "$($env:USERNAME):(R,W)"`（与 Unix `chmod 600` 意图相近，权限模型不同）。
+
 编辑 `~/.config/last30days-cn/.env`，按需填入 API Key：
 
 ```ini
@@ -235,6 +237,8 @@ python scripts/last30days.py "AI编程助手" --emit compact
 | `--days N` | 回溯天数 | `--days 7`（最近一周） |
 | `--search` | 指定搜索源 | `--search weibo,bilibili,zhihu` |
 | `--diagnose` | 诊断配置 | 显示各平台可用状态 |
+| `--timeout SECS` | 全局超时秒数 | 覆盖默认全局超时 |
+| `--save-dir DIR` | 自动保存原始输出目录 | 将原始输出写入指定目录 |
 | `--debug` | 调试模式 | 输出详细日志 |
 
 ### 使用示例
@@ -425,6 +429,8 @@ playwright install chromium
 mkdir -p ~/.config/last30days-cn
 # Edit ~/.config/last30days-cn/.env with your API keys (all optional)
 ```
+
+**Windows (PowerShell):** create the config directory with `New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.config\last30days-cn"`, then create the file with `New-Item -ItemType File -Path "$env:USERPROFILE\.config\last30days-cn\.env" -Force` (or edit `%USERPROFILE%\.config\last30days-cn\.env` in your editor). To restrict `.env` to the current user (similar intent to `chmod 600`; ACL model differs), run `icacls "$env:USERPROFILE\.config\last30days-cn\.env" /inheritance:r /grant:r "$($env:USERNAME):(R,W)"`.
 
 ### Usage
 
