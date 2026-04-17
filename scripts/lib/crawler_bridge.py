@@ -4,6 +4,11 @@
 技术原理: 利用 Playwright 控制浏览器，通过保留登录态的上下文获取平台数据，
          无需逆向复杂加密算法，无需付费 API Key。
 
+v2.1 改动：
+- 抽取 `_launch_browser_context` 公共函数，统一 locale/viewport/UA
+- 小红书/抖音改用 `page.on("response")` XHR 拦截，避开 Virtual DOM 渲染
+- `page.goto` 统一使用 `wait_until="domcontentloaded"`，配合条件轮询替代固定 sleep
+
 ⚠️ 免责声明:
 本模块仅供学习和研究目的。使用者必须遵守相关法律法规及各平台的服务条款。
 禁止用于商业用途、大规模数据采集或任何非法活动。
@@ -15,12 +20,22 @@ import json
 import os
 import re
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 COOKIE_DIR = Path.home() / ".config" / "last30days-cn" / "browser_cookies"
 _playwright_available: Optional[bool] = None
+
+_DESKTOP_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
+_MOBILE_UA = (
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+    "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+)
 
 
 def is_playwright_available() -> bool:
@@ -29,7 +44,7 @@ def is_playwright_available() -> bool:
     if _playwright_available is not None:
         return _playwright_available
     try:
-        from playwright.sync_api import sync_playwright
+        from playwright.sync_api import sync_playwright  # noqa: F401
         _playwright_available = True
     except ImportError:
         _playwright_available = False
@@ -67,52 +82,104 @@ def _clean_html(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+@contextmanager
+def _launch_browser_context(platform: str, mobile: bool = False, headless: bool = True):
+    """统一构造 Playwright 浏览器上下文，自动加载并回写 cookies。
+
+    Yields:
+        (browser, context, page) 三元组
+    """
+    from playwright.sync_api import sync_playwright
+
+    ua = _MOBILE_UA if mobile else _DESKTOP_UA
+    viewport = {"width": 390, "height": 844} if mobile else {"width": 1280, "height": 800}
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=headless)
+        try:
+            context = browser.new_context(
+                user_agent=ua,
+                locale="zh-CN",
+                timezone_id="Asia/Shanghai",
+                viewport=viewport,
+            )
+            cookies = load_cookies(platform)
+            if cookies:
+                try:
+                    context.add_cookies(cookies)
+                except Exception as e:
+                    sys.stderr.write(f"[爬虫-{platform}] 加载 Cookie 失败: {e}\n")
+
+            page = context.new_page()
+            try:
+                yield browser, context, page
+            finally:
+                try:
+                    save_cookies(platform, context.cookies())
+                except Exception:
+                    pass
+        finally:
+            try:
+                browser.close()
+            except Exception:
+                pass
+
+
+def _wait_for(page, predicate, timeout_ms: int = 8000, interval_ms: int = 500) -> bool:
+    """轮询等待条件满足，返回是否在超时前命中。"""
+    elapsed = 0
+    while elapsed < timeout_ms:
+        try:
+            if predicate():
+                return True
+        except Exception:
+            pass
+        page.wait_for_timeout(interval_ms)
+        elapsed += interval_ms
+    return False
+
+
 def crawl_weibo(topic: str, limit: int = 20) -> List[Dict[str, Any]]:
     """通过浏览器自动化爬取微博搜索结果。"""
     if not is_playwright_available():
         return []
 
-    items = []
+    items: List[Dict[str, Any]] = []
     try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            try:
-                context = browser.new_context(
-                    user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15"
-                )
-                cookies = load_cookies("weibo")
-                if cookies:
-                    context.add_cookies(cookies)
+        with _launch_browser_context("weibo", mobile=True) as (browser, context, page):
+            search_url = (
+                f"https://m.weibo.cn/api/container/getIndex?"
+                f"containerid=100103type%3D1%26q%3D{topic}&page_type=searchall"
+            )
+            page.goto(
+                f"https://m.weibo.cn/search?containerid=100103type%3D1%26q%3D{topic}",
+                wait_until="domcontentloaded",
+                timeout=20000,
+            )
+            page.wait_for_timeout(1500)
 
-                page = context.new_page()
-                search_url = f"https://m.weibo.cn/api/container/getIndex?containerid=100103type%3D1%26q%3D{topic}&page_type=searchall"
-                page.goto(f"https://m.weibo.cn/search?containerid=100103type%3D1%26q%3D{topic}")
-                page.wait_for_timeout(2000)
+            response = page.evaluate(
+                """
+                async (url) => {
+                    const resp = await fetch(url);
+                    return await resp.json();
+                }
+                """,
+                search_url,
+            )
 
-                response = page.evaluate("""
-                    async (url) => {
-                        const resp = await fetch(url);
-                        return await resp.json();
-                    }
-                """, search_url)
-
-                if isinstance(response, dict):
-                    cards = response.get("data", {}).get("cards", [])
-                    for card in cards[:limit]:
-                        if card.get("card_type") == 9:
-                            mblog = card.get("mblog", {})
+            if isinstance(response, dict):
+                cards = response.get("data", {}).get("cards", [])
+                for card in cards[:limit]:
+                    if card.get("card_type") == 9:
+                        mblog = card.get("mblog", {})
+                        if mblog:
+                            items.append(_parse_weibo_mblog(mblog))
+                    elif card.get("card_type") == 11:
+                        for group in card.get("card_group", []):
+                            mblog = group.get("mblog", {})
                             if mblog:
                                 items.append(_parse_weibo_mblog(mblog))
-                        elif card.get("card_type") == 11:
-                            for group in card.get("card_group", []):
-                                mblog = group.get("mblog", {})
-                                if mblog:
-                                    items.append(_parse_weibo_mblog(mblog))
-
-                save_cookies("weibo", context.cookies())
-            finally:
-                browser.close()
     except Exception as e:
         sys.stderr.write(f"[爬虫-微博] 浏览器爬取失败: {e}\n")
     return items
@@ -139,41 +206,96 @@ def _parse_weibo_mblog(mblog: dict) -> Dict[str, Any]:
 
 
 def crawl_xiaohongshu(topic: str, limit: int = 20) -> List[Dict[str, Any]]:
-    """通过浏览器自动化爬取小红书搜索结果。"""
+    """通过浏览器自动化爬取小红书搜索结果。
+
+    v2.1：参考 MediaCrawler 思路，优先拦截 XHR `/api/sns/web/v1/search/notes`
+    避开 Virtual DOM。失败时回退到 DOM 选择器（命中率较低，仅作兜底）。
+    """
     if not is_playwright_available():
         return []
 
-    items = []
+    items: List[Dict[str, Any]] = []
     try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+        with _launch_browser_context("xiaohongshu") as (browser, context, page):
+            captured: Dict[str, Any] = {"payload": None}
+
+            def _on_response(resp):
+                try:
+                    url = resp.url
+                    if "/api/sns/web/v1/search/notes" in url and resp.status == 200:
+                        captured["payload"] = resp.json()
+                except Exception:
+                    pass
+
+            page.on("response", _on_response)
+
+            search_url = (
+                f"https://www.xiaohongshu.com/search_result?"
+                f"keyword={topic}&source=web_search_result_notes"
+            )
             try:
-                context = browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+            except Exception as e:
+                sys.stderr.write(f"[爬虫-小红书] 页面加载失败: {e}\n")
+
+            for _ in range(5):
+                if captured["payload"]:
+                    break
+                try:
+                    page.mouse.wheel(0, 2000)
+                except Exception:
+                    pass
+                page.wait_for_timeout(1500)
+
+            payload = captured["payload"]
+            if isinstance(payload, dict):
+                data = payload.get("data") or {}
+                raw_items = data.get("items") or []
+                for raw in raw_items[:limit]:
+                    note_card = raw.get("note_card") or {}
+                    if not note_card:
+                        continue
+                    note_id = raw.get("id") or note_card.get("note_id", "")
+                    user = note_card.get("user") or {}
+                    interact = note_card.get("interact_info") or {}
+                    items.append({
+                        "title": note_card.get("display_title") or note_card.get("title", ""),
+                        "desc": note_card.get("desc", ""),
+                        "url": f"https://www.xiaohongshu.com/explore/{note_id}" if note_id else "",
+                        "author_name": user.get("nickname") or user.get("nick_name", ""),
+                        "author_id": user.get("user_id") or user.get("userid", ""),
+                        "date": None,
+                        "engagement": {
+                            "likes": _parse_count(str(interact.get("liked_count", "0"))),
+                            "collects": _parse_count(str(interact.get("collected_count", "0"))),
+                            "comments": _parse_count(str(interact.get("comment_count", "0"))),
+                            "shares": _parse_count(str(interact.get("share_count", "0"))),
+                        },
+                        "hashtags": [],
+                        "images": [
+                            img.get("url_default") or img.get("url", "")
+                            for img in (note_card.get("image_list") or [])
+                            if isinstance(img, dict)
+                        ],
+                        "source": "crawler-xhr",
+                    })
+
+            if not items:
+                note_elements = page.query_selector_all(
+                    "section.note-item, div[class*='note-item'], a[class*='cover'], a[href*='/explore/']"
                 )
-                cookies = load_cookies("xiaohongshu")
-                if cookies:
-                    context.add_cookies(cookies)
-
-                page = context.new_page()
-                search_url = f"https://www.xiaohongshu.com/search_result?keyword={topic}&source=web_search_result_notes"
-                page.goto(search_url)
-                page.wait_for_timeout(3000)
-
-                note_elements = page.query_selector_all('section.note-item, div[class*="note-item"], a[class*="cover"]')
                 for elem in note_elements[:limit]:
                     try:
-                        title_el = elem.query_selector('span[class*="title"], div[class*="title"]')
+                        title_el = elem.query_selector("span[class*='title'], div[class*='title']")
                         title = title_el.inner_text() if title_el else ""
                         link = elem.get_attribute("href") or ""
                         if link and not link.startswith("http"):
                             link = f"https://www.xiaohongshu.com{link}"
 
-                        author_el = elem.query_selector('span[class*="name"], div[class*="author"]')
+                        author_el = elem.query_selector("span[class*='name'], div[class*='author']")
                         author = author_el.inner_text() if author_el else ""
 
-                        likes_el = elem.query_selector('span[class*="like"], span[class*="count"]')
+                        likes_el = elem.query_selector("span[class*='like'], span[class*='count']")
                         likes_text = likes_el.inner_text() if likes_el else "0"
                         likes = _parse_count(likes_text)
 
@@ -192,46 +314,90 @@ def crawl_xiaohongshu(topic: str, limit: int = 20) -> List[Dict[str, Any]]:
                             },
                             "hashtags": [],
                             "images": [],
-                            "source": "crawler",
+                            "source": "crawler-dom",
                         })
                     except Exception:
                         continue
-
-                save_cookies("xiaohongshu", context.cookies())
-            finally:
-                browser.close()
     except Exception as e:
         sys.stderr.write(f"[爬虫-小红书] 浏览器爬取失败: {e}\n")
     return items
 
 
 def crawl_douyin(topic: str, limit: int = 20) -> List[Dict[str, Any]]:
-    """通过浏览器自动化爬取抖音搜索结果。"""
+    """通过浏览器自动化爬取抖音搜索结果。
+
+    v2.1：优先拦截 XHR `/aweme/v1/web/search/item/`，DOM 解析作为兜底。
+    """
     if not is_playwright_available():
         return []
 
-    items = []
+    items: List[Dict[str, Any]] = []
     try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+        with _launch_browser_context("douyin") as (browser, context, page):
+            captured: Dict[str, Any] = {"payload": None}
+
+            def _on_response(resp):
+                try:
+                    url = resp.url
+                    if "/aweme/v1/web/search/item" in url and resp.status == 200:
+                        data = resp.json()
+                        if isinstance(data, dict) and data.get("data"):
+                            captured["payload"] = data
+                except Exception:
+                    pass
+
+            page.on("response", _on_response)
+
+            search_url = f"https://www.douyin.com/search/{topic}?type=video"
             try:
-                context = browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+            except Exception as e:
+                sys.stderr.write(f"[爬虫-抖音] 页面加载失败: {e}\n")
+
+            for _ in range(5):
+                if captured["payload"]:
+                    break
+                try:
+                    page.mouse.wheel(0, 2000)
+                except Exception:
+                    pass
+                page.wait_for_timeout(1500)
+
+            payload = captured["payload"]
+            if isinstance(payload, dict):
+                for entry in (payload.get("data") or [])[:limit]:
+                    aweme = entry.get("aweme_info") or entry
+                    if not isinstance(aweme, dict):
+                        continue
+                    aweme_id = aweme.get("aweme_id", "")
+                    author = aweme.get("author") or {}
+                    stats = aweme.get("statistics") or {}
+                    items.append({
+                        "text": aweme.get("desc", ""),
+                        "url": f"https://www.douyin.com/video/{aweme_id}" if aweme_id else "",
+                        "author_name": author.get("nickname", ""),
+                        "author_id": author.get("uid", ""),
+                        "date": None,
+                        "engagement": {
+                            "views": stats.get("play_count", 0),
+                            "likes": stats.get("digg_count", 0),
+                            "comments": stats.get("comment_count", 0),
+                            "shares": stats.get("share_count", 0),
+                        },
+                        "hashtags": [],
+                        "duration": (aweme.get("duration") or 0) // 1000,
+                        "source": "crawler-xhr",
+                    })
+
+            if not items:
+                video_elements = page.query_selector_all(
+                    "div[class*='video-card'], li[class*='search-result']"
                 )
-                cookies = load_cookies("douyin")
-                if cookies:
-                    context.add_cookies(cookies)
-
-                page = context.new_page()
-                search_url = f"https://www.douyin.com/search/{topic}?type=video"
-                page.goto(search_url)
-                page.wait_for_timeout(3000)
-
-                video_elements = page.query_selector_all('div[class*="video-card"], li[class*="search-result"]')
                 for elem in video_elements[:limit]:
                     try:
-                        title_el = elem.query_selector('a[class*="title"], span[class*="title"], p[class*="desc"]')
+                        title_el = elem.query_selector(
+                            "a[class*='title'], span[class*='title'], p[class*='desc']"
+                        )
                         title = title_el.inner_text() if title_el else ""
 
                         link_el = elem.query_selector("a[href*='/video/']")
@@ -243,10 +409,12 @@ def crawl_douyin(topic: str, limit: int = 20) -> List[Dict[str, Any]]:
                             else:
                                 link = href
 
-                        author_el = elem.query_selector('span[class*="author"], span[class*="nickname"]')
+                        author_el = elem.query_selector(
+                            "span[class*='author'], span[class*='nickname']"
+                        )
                         author = author_el.inner_text() if author_el else ""
 
-                        likes_el = elem.query_selector('span[class*="like"], span[class*="digg"]')
+                        likes_el = elem.query_selector("span[class*='like'], span[class*='digg']")
                         likes = _parse_count(likes_el.inner_text() if likes_el else "0")
 
                         items.append({
@@ -263,14 +431,10 @@ def crawl_douyin(topic: str, limit: int = 20) -> List[Dict[str, Any]]:
                             },
                             "hashtags": [],
                             "duration": 0,
-                            "source": "crawler",
+                            "source": "crawler-dom",
                         })
                     except Exception:
                         continue
-
-                save_cookies("douyin", context.cookies())
-            finally:
-                browser.close()
     except Exception as e:
         sys.stderr.write(f"[爬虫-抖音] 浏览器爬取失败: {e}\n")
     return items
@@ -281,67 +445,68 @@ def crawl_bilibili(topic: str, limit: int = 20) -> List[Dict[str, Any]]:
     if not is_playwright_available():
         return []
 
-    items = []
+    items: List[Dict[str, Any]] = []
     try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+        with _launch_browser_context("bilibili") as (browser, context, page):
+            search_url = f"https://search.bilibili.com/all?keyword={topic}&order=totalrank"
             try:
-                context = browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                )
+                page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+            except Exception as e:
+                sys.stderr.write(f"[爬虫-B站] 页面加载失败: {e}\n")
 
-                page = context.new_page()
-                search_url = f"https://search.bilibili.com/all?keyword={topic}&order=totalrank"
-                page.goto(search_url)
-                page.wait_for_timeout(3000)
+            _wait_for(
+                page,
+                lambda: bool(page.query_selector("div.bili-video-card, div[class*='video-list-item']")),
+                timeout_ms=8000,
+            )
 
-                video_elements = page.query_selector_all('div.bili-video-card, div[class*="video-list-item"]')
-                for elem in video_elements[:limit]:
-                    try:
-                        title_el = elem.query_selector('h3[class*="title"], a[class*="title"]')
-                        title = _clean_html(title_el.inner_text()) if title_el else ""
+            video_elements = page.query_selector_all(
+                "div.bili-video-card, div[class*='video-list-item']"
+            )
+            for elem in video_elements[:limit]:
+                try:
+                    title_el = elem.query_selector("h3[class*='title'], a[class*='title']")
+                    title = _clean_html(title_el.inner_text()) if title_el else ""
 
-                        link_el = elem.query_selector("a[href*='/video/']")
-                        link = ""
-                        if link_el:
-                            href = link_el.get_attribute("href") or ""
-                            if href.startswith("//"):
-                                link = f"https:{href}"
-                            elif href.startswith("/"):
-                                link = f"https://www.bilibili.com{href}"
-                            else:
-                                link = href
+                    link_el = elem.query_selector("a[href*='/video/']")
+                    link = ""
+                    if link_el:
+                        href = link_el.get_attribute("href") or ""
+                        if href.startswith("//"):
+                            link = f"https:{href}"
+                        elif href.startswith("/"):
+                            link = f"https://www.bilibili.com{href}"
+                        else:
+                            link = href
 
-                        author_el = elem.query_selector('span[class*="name"], span.bili-video-card__info--author')
-                        author = author_el.inner_text() if author_el else ""
+                    author_el = elem.query_selector(
+                        "span[class*='name'], span.bili-video-card__info--author"
+                    )
+                    author = author_el.inner_text() if author_el else ""
 
-                        views_el = elem.query_selector('span[class*="play"], span[class*="view"]')
-                        views = _parse_count(views_el.inner_text() if views_el else "0")
+                    views_el = elem.query_selector("span[class*='play'], span[class*='view']")
+                    views = _parse_count(views_el.inner_text() if views_el else "0")
 
-                        items.append({
-                            "title": title,
-                            "url": link,
-                            "bvid": "",
-                            "channel_name": author,
-                            "author_mid": "",
-                            "date": None,
-                            "duration": "",
-                            "description": "",
-                            "engagement": {
-                                "views": views,
-                                "danmaku": 0,
-                                "comments": 0,
-                                "favorites": 0,
-                                "likes": 0,
-                            },
-                            "source": "crawler",
-                        })
-                    except Exception:
-                        continue
-
-            finally:
-                browser.close()
+                    items.append({
+                        "title": title,
+                        "url": link,
+                        "bvid": "",
+                        "channel_name": author,
+                        "author_mid": "",
+                        "date": None,
+                        "duration": "",
+                        "description": "",
+                        "engagement": {
+                            "views": views,
+                            "danmaku": 0,
+                            "comments": 0,
+                            "favorites": 0,
+                            "likes": 0,
+                        },
+                        "source": "crawler",
+                    })
+                except Exception:
+                    continue
     except Exception as e:
         sys.stderr.write(f"[爬虫-B站] 浏览器爬取失败: {e}\n")
     return items
@@ -352,68 +517,71 @@ def crawl_zhihu(topic: str, limit: int = 20) -> List[Dict[str, Any]]:
     if not is_playwright_available():
         return []
 
-    items = []
+    items: List[Dict[str, Any]] = []
     try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+        with _launch_browser_context("zhihu") as (browser, context, page):
+            search_url = f"https://www.zhihu.com/search?type=content&q={topic}"
             try:
-                context = browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                )
-                cookies = load_cookies("zhihu")
-                if cookies:
-                    context.add_cookies(cookies)
+                page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+            except Exception as e:
+                sys.stderr.write(f"[爬虫-知乎] 页面加载失败: {e}\n")
 
-                page = context.new_page()
-                search_url = f"https://www.zhihu.com/search?type=content&q={topic}"
-                page.goto(search_url)
-                page.wait_for_timeout(3000)
+            _wait_for(
+                page,
+                lambda: bool(page.query_selector("div.SearchResult-Card, div[class*='List-item']")),
+                timeout_ms=8000,
+            )
 
-                result_elements = page.query_selector_all('div.SearchResult-Card, div[class*="List-item"]')
-                for elem in result_elements[:limit]:
-                    try:
-                        title_el = elem.query_selector('h2[class*="ContentItem-title"], span[class*="Highlight"]')
-                        title = _clean_html(title_el.inner_text()) if title_el else ""
+            result_elements = page.query_selector_all(
+                "div.SearchResult-Card, div[class*='List-item']"
+            )
+            for elem in result_elements[:limit]:
+                try:
+                    title_el = elem.query_selector(
+                        "h2[class*='ContentItem-title'], span[class*='Highlight']"
+                    )
+                    title = _clean_html(title_el.inner_text()) if title_el else ""
 
-                        link_el = elem.query_selector("a[href*='/question/'], a[href*='/p/']")
-                        link = ""
-                        if link_el:
-                            href = link_el.get_attribute("href") or ""
-                            if href.startswith("/"):
-                                link = f"https://www.zhihu.com{href}"
-                            else:
-                                link = href
+                    link_el = elem.query_selector("a[href*='/question/'], a[href*='/p/']")
+                    link = ""
+                    if link_el:
+                        href = link_el.get_attribute("href") or ""
+                        if href.startswith("/"):
+                            link = f"https://www.zhihu.com{href}"
+                        else:
+                            link = href
 
-                        excerpt_el = elem.query_selector('span[class*="RichText"], div[class*="RichText"]')
-                        excerpt = _clean_html(excerpt_el.inner_text()[:300]) if excerpt_el else ""
+                    excerpt_el = elem.query_selector(
+                        "span[class*='RichText'], div[class*='RichText']"
+                    )
+                    excerpt = _clean_html(excerpt_el.inner_text()[:300]) if excerpt_el else ""
 
-                        author_el = elem.query_selector('span[class*="AuthorInfo"] a, a[class*="UserLink"]')
-                        author = author_el.inner_text() if author_el else ""
+                    author_el = elem.query_selector(
+                        "span[class*='AuthorInfo'] a, a[class*='UserLink']"
+                    )
+                    author = author_el.inner_text() if author_el else ""
 
-                        voteup_el = elem.query_selector('button[class*="VoteButton"] span, span[class*="vote"]')
-                        voteups = _parse_count(voteup_el.inner_text() if voteup_el else "0")
+                    voteup_el = elem.query_selector(
+                        "button[class*='VoteButton'] span, span[class*='vote']"
+                    )
+                    voteups = _parse_count(voteup_el.inner_text() if voteup_el else "0")
 
-                        items.append({
-                            "title": title,
-                            "excerpt": excerpt,
-                            "url": link,
-                            "author": author,
-                            "date": None,
-                            "content_type": "search_result",
-                            "engagement": {
-                                "voteups": voteups,
-                                "comments": 0,
-                                "collects": 0,
-                            },
-                            "source": "crawler",
-                        })
-                    except Exception:
-                        continue
-
-                save_cookies("zhihu", context.cookies())
-            finally:
-                browser.close()
+                    items.append({
+                        "title": title,
+                        "excerpt": excerpt,
+                        "url": link,
+                        "author": author,
+                        "date": None,
+                        "content_type": "search_result",
+                        "engagement": {
+                            "voteups": voteups,
+                            "comments": 0,
+                            "collects": 0,
+                        },
+                        "source": "crawler",
+                    })
+                except Exception:
+                    continue
     except Exception as e:
         sys.stderr.write(f"[爬虫-知乎] 浏览器爬取失败: {e}\n")
     return items
@@ -423,7 +591,7 @@ def _parse_count(text: str) -> int:
     """解析数量文本，支持 '1.2万' / '1.2w' / '12k' 等格式。"""
     if not text:
         return 0
-    text = text.strip().replace(",", "")
+    text = str(text).strip().replace(",", "")
     try:
         if "万" in text or text.lower().endswith("w"):
             num = float(re.sub(r"[万wW]", "", text))

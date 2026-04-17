@@ -6,7 +6,7 @@
 
 🔗 本项目基于 [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill) 进行深度本土化改造，完全面向中国用户和中文互联网平台。
 
-🕷️ v2.0 集成 [MediaCrawler](https://github.com/NanmiCoder/MediaCrawler) 爬虫引擎思路，大幅减少 API Key 依赖。
+🕷️ v2.0 集成 [MediaCrawler](https://github.com/NanmiCoder/MediaCrawler) 爬虫引擎思路，大幅减少 API Key 依赖。v2.1 修复百度/小红书反爬问题，XHR 拦截替代 DOM 解析，Bing 兜底搜索，已移除无效的 ScrapeCreators 小红书集成。
 
 👤 **作者 / Author:** Jesse ([@Jesseovo](https://github.com/Jesseovo))
 
@@ -279,12 +279,12 @@ v2.0 采用三级自动降级策略，确保最大可用性：
 | 平台 | API 模式 | 爬虫模式 | 公开接口 |
 |:---:|:---:|:---:|:---:|
 | 微博 | `WEIBO_ACCESS_TOKEN` | ✅ Playwright | ✅ m.weibo.cn |
-| 小红书 | `SCRAPECREATORS_API_KEY` | ✅ Playwright | ✅ 备用接口 |
+| 小红书 | MCP HTTP API(可选) | ✅ Playwright (XHR拦截) | ⚠️ 命中率低 |
 | B站 | - | ✅ Playwright(备用) | ✅ 公开 API |
 | 知乎 | `ZHIHU_COOKIE`(增强) | ✅ Playwright(备用) | ✅ 公开搜索 |
 | 抖音 | `TIKHUB_API_KEY` | ✅ Playwright | ✅ 备用接口 |
 | 微信 | `WECHAT_API_KEY` | - | ✅ 搜狗搜索 |
-| 百度 | `BAIDU_API_KEY` | - | ✅ 公开搜索 |
+| 百度 | `BAIDU_API_KEY` | - | ⚠️ 公开搜索可能被拦截，Bing 兜底 |
 | 头条 | - | - | ✅ 公开接口 |
 
 ---
