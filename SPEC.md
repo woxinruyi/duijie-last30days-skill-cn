@@ -103,3 +103,4 @@ python3 scripts/last30days.py <topic> [选项]
 - 目录覆盖：`LAST30DAYS_CN_CONFIG_DIR` / `LAST30DAYS_CONFIG_DIR`  
 
 完整键名以 `scripts/lib/env.py` 中 `get_config()` 为准。
+

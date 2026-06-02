@@ -8,7 +8,30 @@
 
 🕷️ v2.0 集成 [MediaCrawler](https://github.com/NanmiCoder/MediaCrawler) 爬虫引擎思路，大幅减少 API Key 依赖。v2.1 修复百度/小红书反爬问题，XHR 拦截替代 DOM 解析，Bing 兜底搜索，已移除无效的 ScrapeCreators 小红书集成。
 
+当前版本：`v3.0.0`
+
 👤 **作者 / Author:** Jesse ([@Jesseovo](https://github.com/Jesseovo))
+
+---
+
+## ✨ v3.0.0 升级内容
+
+- 追平原版 v3 的 Agent Skills 包结构：`skills/last30days` 现在是可独立安装的运行载荷。
+- 中文 CLI 统一使用单入口 `last30days.py`，根目录和 Skill 载荷保持同名结构。
+- 新增 `--emit html` 和 `--emit html-path`，可生成离线可打开的 `report.html`。
+- HTML 报告融入 [op7418/guizang-ppt-skill](https://github.com/op7418/guizang-ppt-skill) 的 Swiss/IKB 视觉语言，适合浏览、归档、打印。
+- 小红书和知乎搜索增加空结果兜底说明，失败时会标注已尝试路径与可能原因。
+- 根目录 `scripts/` 继续保留，方便本地开发和旧路径调用；Agent Skills 安装使用 `skills/last30days/scripts` 下的自包含载荷。
+
+### ✅ v3.0.0 质量验证
+
+本次发布前已完成以下质检：
+
+- `main`、`origin/main`、`upgrade/v3-cn-guizang-html`、`origin/upgrade/v3-cn-guizang-html` 均指向同一提交，保留分支但不再产生待合并提示。
+- 远端发布 tag 统一为 `v3.0.0`，没有额外 v3 派生 tag。
+- 根目录与 Skill 载荷均统一使用 `last30days.py` 单入口，没有额外入口文件。
+- 全量测试通过：`py -m pytest`，共 `172 passed`。
+- 根目录入口和 Skill 载荷入口均已验证：`py scripts/last30days.py --diagnose` 与 `py skills/last30days/scripts/last30days.py --diagnose` 均可正常输出平台可用性诊断。
 
 ---
 
@@ -86,6 +109,12 @@
 
 ## 🤖 Agent 平台安装
 
+### Agent Skills（推荐）
+
+```bash
+npx skills add Jesseovo/last30days-skill-cn -g
+```
+
 ### Cursor（推荐）
 
 将项目克隆到 Cursor 技能目录：
@@ -99,8 +128,8 @@ git clone https://github.com/Jesseovo/last30days-skill-cn.git
 ### Claude Code
 
 ```bash
-# 方式一：通过 Marketplace 安装（推荐）
-claude install Jesseovo/last30days-skill-cn
+# 方式一：通过 Agent Skills 安装（推荐）
+npx skills add Jesseovo/last30days-skill-cn -g
 
 # 方式二：手动安装
 git clone https://github.com/Jesseovo/last30days-skill-cn.git ~/.claude/skills/last30days-cn
@@ -225,13 +254,14 @@ python scripts/last30days.py --diagnose
 
 ```bash
 python scripts/last30days.py "AI编程助手" --emit compact
+python scripts/last30days.py "AI编程助手" --emit html-path
 ```
 
 ### 命令行参数
 
 | 参数 | 说明 | 示例 |
 |:---:|:---:|:---:|
-| `--emit` | 输出模式 | `compact` / `json` / `md` / `context` / `path` |
+| `--emit` | 输出模式 | `compact` / `json` / `md` / `context` / `path` / `html` / `html-path` |
 | `--quick` | 快速搜索 | 更少数据源，更快速度 |
 | `--deep` | 深度搜索 | 更多数据源，更全面 |
 | `--days N` | 回溯天数 | `--days 7`（最近一周） |
@@ -258,6 +288,9 @@ python scripts/last30days.py "ChatGPT替代品" --emit json
 
 # 🗓️ 仅搜索最近 7 天
 python scripts/last30days.py "热门话题" --days 7
+
+# 🧾 生成可离线打开的 HTML 报告
+python scripts/last30days.py "具身智能" --deep --emit html-path
 ```
 
 ---
@@ -298,7 +331,7 @@ last30days-skill-cn/
 ├── 📄 LICENSE               # MIT 许可证
 ├── 📄 requirements.txt      # Python 依赖
 ├── 📁 scripts/
-│   ├── 🐍 last30days.py     # 主入口 CLI
+│   ├── 🐍 last30days.py     # 中文主入口 CLI
 │   └── 📁 lib/
 │       ├── crawler_bridge.py  # 🆕 MediaCrawler 爬虫桥接模块
 │       ├── weibo.py          # 微博搜索模块
@@ -324,6 +357,12 @@ last30days-skill-cn/
 │       ├── http.py           # HTTP 客户端
 │       ├── ui.py             # 终端 UI
 │       └── setup_wizard.py   # 配置向导
+├── 📁 skills/
+│   └── 📁 last30days/        # Agent Skills 自包含运行载荷
+│       ├── 📄 SKILL.md       # 安装后供 Agent 读取的技能说明
+│       └── 📁 scripts/
+│           ├── 🐍 last30days.py
+│           └── 📁 lib/       # 与根目录脚本同步的运行依赖
 ├── 📁 fixtures/              # 示例数据
 ├── 📁 tests/                 # 测试用例
 └── 📁 hooks/                 # Agent 钩子
@@ -436,6 +475,7 @@ mkdir -p ~/.config/last30days-cn
 
 ```bash
 python scripts/last30days.py "AI tools" --emit compact
+python scripts/last30days.py "AI tools" --emit html-path
 python scripts/last30days.py --diagnose   # Check platform availability
 ```
 
@@ -444,7 +484,7 @@ python scripts/last30days.py --diagnose   # Check platform availability
 | Agent Platform | Installation Path |
 |:---:|:---|
 | **Cursor** | Clone and add SKILL.md as project skill |
-| **Claude Code** | `claude install Jesseovo/last30days-skill-cn` |
+| **Claude Code** | `npx skills add Jesseovo/last30days-skill-cn -g` |
 | **OpenClaw** | `~/.agents/skills/last30days-cn` |
 | **Gemini CLI** | Load as Gemini extension |
 | **General** | Any agent with Bash/Read/Write tools |
@@ -457,3 +497,4 @@ This project is licensed under the [MIT License](LICENSE).
 
 - 🔗 Original: [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill) by Matt Van Horn
 - 🇨🇳 Chinese Fork: Jesse ([@Jesseovo](https://github.com/Jesseovo))
+
