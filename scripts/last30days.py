@@ -312,6 +312,7 @@ def main():
                 "cached_logins": crawler_status["cached_logins"],
                 "note": "安装 Playwright 后，微博/小红书/抖音/B站/知乎可无需 API Key 使用爬虫模式",
             },
+            "note_douyin_toutiao": "抖音/头条原生接口需签名参数，常被风控；接口失败时改用公开搜索引擎兜底，仅能拿到公开链接，无真实互动数据与精确日期。",
         }
         print(json.dumps(diag, indent=2, ensure_ascii=False))
         sys.exit(0)

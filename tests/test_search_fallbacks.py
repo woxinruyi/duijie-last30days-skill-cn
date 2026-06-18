@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
-from lib import env, xiaohongshu, zhihu
+from lib import douyin, env, normalize, toutiao, xiaohongshu, zhihu
 
 
 BING_XHS_HTML = """
@@ -45,6 +45,49 @@ def test_zhihu_site_search_fallback_parses_bing_html():
     assert items[0]["title"] == "知乎 AI 工具讨论"
     assert items[0]["source"] == "site-search-fallback"
     assert items[0]["content_type"] == "question"
+
+
+BING_DOUYIN_HTML = """
+<html><body>
+<li class="b_algo">
+  <h2><a href="https://www.douyin.com/video/7234567890">抖音 AI 编程助手实测</a></h2>
+  <p>这是一条来自抖音的公开搜索摘要。</p>
+</li>
+</body></html>
+"""
+
+
+BING_TOUTIAO_HTML = """
+<html><body>
+<li class="b_algo">
+  <h2><a href="https://www.toutiao.com/article/7234567890/">头条 AI 编程助手评测</a></h2>
+  <p>这是一条来自头条的公开搜索摘要。</p>
+</li>
+</body></html>
+"""
+
+
+def test_douyin_site_search_fallback_parses_bing_html():
+    with patch.object(douyin, "_fetch_html", return_value=BING_DOUYIN_HTML):
+        items = douyin._search_via_site_search("AI 编程助手", 5)
+
+    assert len(items) == 1
+    assert "抖音 AI 编程助手实测" in items[0]["text"]
+    assert items[0]["source"] == "site-search-fallback"
+    assert "douyin.com/video" in items[0]["url"]
+    # 字段形状能被 normalize 正常消费
+    normalize.normalize_douyin_items(items, "2026-01-01", "2026-12-31")
+
+
+def test_toutiao_site_search_fallback_parses_bing_html():
+    with patch.object(toutiao, "_fetch_html", return_value=BING_TOUTIAO_HTML):
+        items = toutiao._search_via_site_search("AI 编程助手", 5)
+
+    assert len(items) == 1
+    assert items[0]["title"] == "头条 AI 编程助手评测"
+    assert items[0]["source"] == "site-search-fallback"
+    assert "toutiao.com/article" in items[0]["url"]
+    normalize.normalize_toutiao_items(items, "2026-01-01", "2026-12-31")
 
 
 def test_xiaohongshu_diagnose_available_with_fallback_when_mcp_down():
