@@ -1,3 +1,12 @@
+<p align="center">
+  <img src="assets/banner.jpg" alt="last30days-cn — 中国平台深度研究引擎" width="380">
+</p>
+
+<p align="center">
+  <b>简体中文</b> ·
+  <a href="README.en.md">English</a>
+</p>
+
 # 📰 last30days-cn — 中国平台深度研究引擎
 
 > 🚀 30 天的研究，30 秒的结果。8 大平台。零过时信息。
@@ -21,16 +30,17 @@
 - 新增 `--emit html` 和 `--emit html-path`，可生成离线可打开的 `report.html`。
 - HTML 报告融入 [op7418/guizang-ppt-skill](https://github.com/op7418/guizang-ppt-skill) 的 Swiss/IKB 视觉语言，适合浏览、归档、打印。
 - 小红书和知乎搜索增加空结果兜底说明，失败时会标注已尝试路径与可能原因。
+- 抖音、头条在原生接口被风控时新增公开搜索引擎兜底，不再静默返回 0 条（见 issue #8）。
+- 修复 macOS/Linux 下 `skills/last30days/SKILL.md` 损坏 symlink 导致的 `npx` 安装失败（见 issue #10）。
 - 根目录 `scripts/` 继续保留，方便本地开发和旧路径调用；Agent Skills 安装使用 `skills/last30days/scripts` 下的自包含载荷。
 
-### ✅ v3.0.0 质量验证
+### ✅ 质量验证
 
 本次发布前已完成以下质检：
 
-- `main`、`origin/main`、`upgrade/v3-cn-guizang-html`、`origin/upgrade/v3-cn-guizang-html` 均指向同一提交，保留分支但不再产生待合并提示。
 - 远端发布 tag 统一为 `v3.0.0`，没有额外 v3 派生 tag。
 - 根目录与 Skill 载荷均统一使用 `last30days.py` 单入口，没有额外入口文件。
-- 全量测试通过：`py -m pytest`，共 `172 passed`。
+- 全量测试通过：`py -m pytest`，共 `176 passed`。
 - 根目录入口和 Skill 载荷入口均已验证：`py scripts/last30days.py --diagnose` 与 `py skills/last30days/scripts/last30days.py --diagnose` 均可正常输出平台可用性诊断。
 
 ---
@@ -98,10 +108,10 @@
 | 📕 小红书 | `xiaohongshu.py` | API / 🕷️爬虫 / 公开接口 | ✅ 爬虫模式无需配置 |
 | 📺 B站 | `bilibili.py` | 公开 API / 🕷️爬虫备用 | ✅ 无需配置 |
 | 💬 知乎 | `zhihu.py` | 公开搜索 / 🕷️爬虫备用 | ✅ 无需配置 |
-| 🎵 抖音 | `douyin.py` | API / 🕷️爬虫 / 公开接口 | ✅ 爬虫模式无需配置 |
+| 🎵 抖音 | `douyin.py` | API / 🕷️爬虫 / 公开接口 / 搜索兜底 | ✅ 爬虫模式无需配置 |
 | 💚 微信 | `wechat.py` | API / 搜狗搜索 | `WECHAT_API_KEY`（可选） |
 | 🔵 百度 | `baidu.py` | 公开搜索 / API | ✅ 基础搜索无需配置 |
-| 📰 头条 | `toutiao.py` | 公开接口 | ✅ 无需配置 |
+| 📰 头条 | `toutiao.py` | 公开接口 / 搜索兜底 | ✅ 无需配置 |
 
 > 🕷️ = 需要安装 Playwright（`pip install playwright && playwright install chromium`）
 
@@ -242,7 +252,8 @@ python scripts/last30days.py --diagnose
     "playwright_available": true,
     "cached_logins": [],
     "note": "安装 Playwright 后，微博/小红书/抖音/B站/知乎可无需 API Key 使用爬虫模式"
-  }
+  },
+  "note_douyin_toutiao": "抖音/头条原生接口需签名参数，常被风控；接口失败时改用公开搜索引擎兜底，仅能拿到公开链接，无真实互动数据与精确日期。"
 }
 ```
 
@@ -305,20 +316,24 @@ v2.0 采用三级自动降级策略，确保最大可用性：
 优先级 2: 爬虫模式（MediaCrawler，需要 Playwright）
     ↓ 失败或未安装
 优先级 3: 公开接口（HTTP 直接请求，无需任何配置）
+    ↓ 仍无结果（抖音/头条/小红书/知乎）
+兜底: 公开搜索引擎（Bing site: 搜索，获取公开链接）
 ```
 
 ### 各平台数据获取方式对比
 
-| 平台 | API 模式 | 爬虫模式 | 公开接口 |
-|:---:|:---:|:---:|:---:|
-| 微博 | `WEIBO_ACCESS_TOKEN` | ✅ Playwright | ✅ m.weibo.cn |
-| 小红书 | MCP HTTP API(可选) | ✅ Playwright (XHR拦截) | ⚠️ 命中率低 |
-| B站 | - | ✅ Playwright(备用) | ✅ 公开 API |
-| 知乎 | `ZHIHU_COOKIE`(增强) | ✅ Playwright(备用) | ✅ 公开搜索 |
-| 抖音 | `TIKHUB_API_KEY` | ✅ Playwright | ✅ 备用接口 |
-| 微信 | `WECHAT_API_KEY` | - | ✅ 搜狗搜索 |
-| 百度 | `BAIDU_API_KEY` | - | ⚠️ 公开搜索可能被拦截，Bing 兜底 |
-| 头条 | - | - | ✅ 公开接口 |
+| 平台 | API 模式 | 爬虫模式 | 公开接口 | 搜索兜底 |
+|:---:|:---:|:---:|:---:|:---:|
+| 微博 | `WEIBO_ACCESS_TOKEN` | ✅ Playwright | ✅ m.weibo.cn | - |
+| 小红书 | MCP HTTP API(可选) | ✅ Playwright (XHR拦截) | ⚠️ 命中率低 | ✅ Bing |
+| B站 | - | ✅ Playwright(备用) | ✅ 公开 API | - |
+| 知乎 | `ZHIHU_COOKIE`(增强) | ✅ Playwright(备用) | ✅ 公开搜索 | ✅ Bing |
+| 抖音 | `TIKHUB_API_KEY` | ✅ Playwright | ⚠️ 需签名 | ✅ Bing |
+| 微信 | `WECHAT_API_KEY` | - | ✅ 搜狗搜索 | - |
+| 百度 | `BAIDU_API_KEY` | - | ⚠️ 公开搜索可能被拦截 | ✅ Bing |
+| 头条 | - | - | ⚠️ 需签名 | ✅ Bing |
+
+> ⚠️ 抖音/头条原生 web 接口现在强制要求签名参数（`a_bogus` / `_signature`），常被风控。接口失败时改用公开搜索引擎兜底，**只能拿到公开链接，无真实互动数据与精确日期**。
 
 ---
 
@@ -327,9 +342,11 @@ v2.0 采用三级自动降级策略，确保最大可用性：
 ```
 last30days-skill-cn/
 ├── 📄 SKILL.md              # Agent 技能定义文件
-├── 📄 README.md             # 项目说明（本文件）
+├── 📄 README.md             # 项目说明（中文，本文件）
+├── 📄 README.en.md          # 项目说明（English）
 ├── 📄 LICENSE               # MIT 许可证
 ├── 📄 requirements.txt      # Python 依赖
+├── 📁 assets/               # README 配图
 ├── 📁 scripts/
 │   ├── 🐍 last30days.py     # 中文主入口 CLI
 │   └── 📁 lib/
@@ -406,95 +423,3 @@ last30days-skill-cn/
 
 - 🔗 原始项目: [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill) by Matt Van Horn
 - 🇨🇳 中文本土化: Jesse ([@Jesseovo](https://github.com/Jesseovo))
-
----
-
----
-
-# 📰 last30days-cn — Chinese Platform Deep Research Engine
-
-> 🚀 30 days of research. 30 seconds of work. 8 platforms. Zero stale info.
-
-**last30days-cn** is an AI Agent skill that automatically searches 8 major Chinese internet platforms for the last 30 days of content and generates well-cited research reports.
-
-🔗 This project is a Chinese-localized fork of [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill), fully adapted for Chinese users and platforms.
-
-🕷️ v2.0 integrates [MediaCrawler](https://github.com/NanmiCoder/MediaCrawler) crawler engine concepts, significantly reducing API key dependencies.
-
-👤 **Author:** Jesse ([@Jesseovo](https://github.com/Jesseovo))
-
----
-
-## ⚠️ Disclaimer
-
-> **This project is for educational and research purposes only.**
-
-1. All crawler features are intended solely for technical learning and research. **Commercial use is strictly prohibited.**
-2. Users must comply with all applicable laws and regulations, including but not limited to data protection and privacy laws.
-3. Users must respect each platform's Terms of Service (ToS) and robots.txt.
-4. The developer assumes **no liability** for any legal consequences arising from the use of this project.
-5. **Do NOT** use this project for large-scale data scraping, personal data collection, or any illegal activities.
-
----
-
-## ✨ Key Features (v2.0)
-
-- 🔍 **8 Chinese Platforms** — Weibo, Xiaohongshu, Bilibili, Zhihu, Douyin, WeChat, Baidu, Toutiao
-- 🕷️ **MediaCrawler Integration** — Playwright-based browser automation, 7/8 platforms work without API keys
-- 🤖 **Multi-Agent Compatible** — Works with Cursor, Claude Code, OpenClaw, Gemini CLI, and more
-- 🇨🇳 **Chinese NLP** — jieba-based word segmentation, Chinese stopwords, synonym expansion
-- 📊 **Smart Scoring** — Relevance 45% + Recency 25% + Engagement 30%
-- 🔄 **Three-tier Fallback** — API → Crawler → Public API, automatic degradation
-
----
-
-## 🚀 Quick Start
-
-### Installation
-
-```bash
-git clone https://github.com/Jesseovo/last30days-skill-cn.git
-cd last30days-skill-cn
-pip install jieba
-
-# Optional: Install Playwright for crawler mode (enables 7/8 platforms without API keys)
-pip install playwright
-playwright install chromium
-```
-
-### Configuration
-
-```bash
-mkdir -p ~/.config/last30days-cn
-# Edit ~/.config/last30days-cn/.env with your API keys (all optional)
-```
-
-**Windows (PowerShell):** create the config directory with `New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.config\last30days-cn"`, then create the file with `New-Item -ItemType File -Path "$env:USERPROFILE\.config\last30days-cn\.env" -Force` (or edit `%USERPROFILE%\.config\last30days-cn\.env` in your editor). To restrict `.env` to the current user (similar intent to `chmod 600`; ACL model differs), run `icacls "$env:USERPROFILE\.config\last30days-cn\.env" /inheritance:r /grant:r "$($env:USERNAME):(R,W)"`.
-
-### Usage
-
-```bash
-python scripts/last30days.py "AI tools" --emit compact
-python scripts/last30days.py "AI tools" --emit html-path
-python scripts/last30days.py --diagnose   # Check platform availability
-```
-
-### Agent Installation
-
-| Agent Platform | Installation Path |
-|:---:|:---|
-| **Cursor** | Clone and add SKILL.md as project skill |
-| **Claude Code** | `npx skills add Jesseovo/last30days-skill-cn -g` |
-| **OpenClaw** | `~/.agents/skills/last30days-cn` |
-| **Gemini CLI** | Load as Gemini extension |
-| **General** | Any agent with Bash/Read/Write tools |
-
----
-
-## 📜 License
-
-This project is licensed under the [MIT License](LICENSE).
-
-- 🔗 Original: [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill) by Matt Van Horn
-- 🇨🇳 Chinese Fork: Jesse ([@Jesseovo](https://github.com/Jesseovo))
-
