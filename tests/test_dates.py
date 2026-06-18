@@ -30,6 +30,19 @@ class TestGetDateRange(unittest.TestCase):
         delta = end - start
         self.assertEqual(delta.days, 30)
 
+    def test_as_of_sets_end_date(self):
+        from_date, to_date = dates.get_date_range(7, as_of="2026-01-15")
+        self.assertEqual(to_date, "2026-01-15")
+        self.assertEqual(from_date, "2026-01-08")
+
+    def test_as_of_none_uses_today(self):
+        # as_of=None 等价于默认行为
+        self.assertEqual(dates.get_date_range(30), dates.get_date_range(30, as_of=None))
+
+    def test_as_of_invalid_raises(self):
+        with self.assertRaises(ValueError):
+            dates.get_date_range(30, as_of="not-a-date")
+
 
 class TestParseDate(unittest.TestCase):
     def test_parse_iso_date(self):

@@ -32,6 +32,7 @@
 - 小红书和知乎搜索增加空结果兜底说明，失败时会标注已尝试路径与可能原因。
 - 抖音、头条在原生接口被风控时新增公开搜索引擎兜底，不再静默返回 0 条（见 issue #8）。
 - 修复 macOS/Linux 下 `skills/last30days/SKILL.md` 损坏 symlink 导致的 `npx` 安装失败（见 issue #10）。
+- 对照上游 [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill) 同步若干平台无关能力：`--as-of` 历史回溯、跨平台聚合热点、`LAST30DAYS_DEFAULT_SEARCH`/`EXCLUDE_SOURCES` 配置开关、诚实 `--diagnose`（实时探测）、HTML 报告 XSS 加固。
 - 根目录 `scripts/` 继续保留，方便本地开发和旧路径调用；Agent Skills 安装使用 `skills/last30days/scripts` 下的自包含载荷。
 
 ### ✅ 质量验证
@@ -276,11 +277,14 @@ python scripts/last30days.py "AI编程助手" --emit html-path
 | `--quick` | 快速搜索 | 更少数据源，更快速度 |
 | `--deep` | 深度搜索 | 更多数据源，更全面 |
 | `--days N` | 回溯天数 | `--days 7`（最近一周） |
+| `--as-of` | 历史回溯终点日期 | `--as-of 2026-05-01`（以该日为终点回溯 N 天） |
 | `--search` | 指定搜索源 | `--search weibo,bilibili,zhihu` |
 | `--diagnose` | 诊断配置 | 显示各平台可用状态 |
 | `--timeout SECS` | 全局超时秒数 | 覆盖默认全局超时 |
 | `--save-dir DIR` | 自动保存原始输出目录 | 将原始输出写入指定目录 |
 | `--debug` | 调试模式 | 输出详细日志 |
+
+> 🔧 **环境变量**：未指定 `--search` 时，回退到 `LAST30DAYS_DEFAULT_SEARCH`（逗号分隔的默认源集）；`EXCLUDE_SOURCES` 可从启用集合中排除指定源。
 
 ### 使用示例
 

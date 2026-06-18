@@ -32,6 +32,7 @@ Current version: `v3.0.0`
 - Xiaohongshu and Zhihu search now report empty-result fallbacks, listing which paths were tried and likely causes on failure.
 - Douyin and Toutiao now fall back to a public search engine when their native APIs are rate-limited, so they no longer silently return 0 results (see issue #8).
 - Fixed `npx` install failure on macOS/Linux caused by a corrupted symlink at `skills/last30days/SKILL.md` (see issue #10).
+- Synced several platform-agnostic capabilities from upstream [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill): `--as-of` historical lookback, cross-source cluster merging, `LAST30DAYS_DEFAULT_SEARCH`/`EXCLUDE_SOURCES` config knobs, honest `--diagnose` (live probes), and HTML report XSS hardening.
 - The repo-root `scripts/` is kept for local development and legacy paths; Agent Skills installs use the self-contained payload under `skills/last30days/scripts`.
 
 ### ✅ Quality checks
@@ -199,11 +200,14 @@ python scripts/last30days.py "AI coding assistant" --emit html-path
 | `--quick` | Quick search | Fewer sources, faster |
 | `--deep` | Deep search | More sources, more thorough |
 | `--days N` | Look-back days | `--days 7` (last week) |
+| `--as-of` | Historical end date | `--as-of 2026-05-01` (look back N days from that date) |
 | `--search` | Specific sources | `--search weibo,bilibili,zhihu` |
 | `--diagnose` | Diagnose config | Show per-platform availability |
 | `--timeout SECS` | Global timeout | Override the default global timeout |
 | `--save-dir DIR` | Auto-save raw output | Write raw output to the given dir |
 | `--debug` | Debug mode | Verbose logging |
+
+> 🔧 **Env vars**: when `--search` is omitted, it falls back to `LAST30DAYS_DEFAULT_SEARCH` (a comma-separated default source set); `EXCLUDE_SOURCES` removes sources from the active set.
 
 ### Examples
 
